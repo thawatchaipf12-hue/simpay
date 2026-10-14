@@ -5,384 +5,67 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SimPay - ระบบสแกนเงินจำลองข้ามเครื่อง</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Prompt', sans-serif; }</style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col items-center justify-center p-4">
-
-    <!-- หน้าเลือกบทบาท -->
-    <div id="role-selector" class="max-w-md w-full bg-white rounded-2xl p-6 shadow-xl border border-slate-200 text-center">
-        <h1 class="text-2xl font-bold text-indigo-600 mb-2">SimPay Online</h1>
-        <p class="text-xs text-slate-500 mb-6">เลือกบทบาทของอุปกรณ์เครื่องนี้เพื่อทำการทดสอบข้ามเครื่อง</p>
-        
-        <div class="space-y-3">
-            <button onclick="setRole('buyer')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition shadow-md">
-                📱 ฉันคือ "ผู้ซื้อ" (Buyer)
-            </button>
-            <button onclick="setRole('seller')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold transition shadow-md">
-                💰 ฉันคือ "ผู้ขาย / ร้านค้า" (Seller)
-            </button>
+<body class="bg-gray-100 min-h-screen p-4">
+    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6">
+        <h1 class="text-xl font-bold text-center text-blue-600 mb-2">SimPay - ระบบสแกนเงินจำลอง</h1>
+        <p class="text-xs text-center text-gray-500 mb-6" id="shop-display-id">ร้านค้า: SHOP-999</p>
+        <div class="bg-blue-600 text-white p-4 rounded-lg shadow mb-6">
+            <p class="text-sm opacity-80">ยอดเงินยอดขายร้านค้า</p>
+            <p class="text-3xl font-bold mt-1" id="balance-display">฿ 0.00</p>
+            <button onclick="resetBalance()" class="mt-3 text-xs bg-blue-700 hover:bg-blue-800 px-3 py-1 rounded">รีเซ็ตยอด</button>
         </div>
-    </div>
-
-    <!-- แอปพลิเคชันหลัก -->
-    <div id="app-container" class="max-w-md w-full hidden flex flex-col">
-        
-        <header id="app-header" class="text-white shadow-md p-3 text-center text-xs font-semibold rounded-t-2xl mb-2 flex justify-between items-center px-4">
-            <span id="role-badge">โหมด: กำลังโหลด...</span>
-            <button onclick="logoutRole()" class="bg-white/20 hover:bg-white/30 px-2 py-1 rounded text-[10px]">เปลี่ยนบทบาท</button>
-        </header>
-
-        <section class="bg-gradient-to-r from-indigo-500 to-violet-600 text-white rounded-2xl p-5 shadow-lg mb-4">
-            <div class="flex justify-between items-center mb-1">
-                <span id="wallet-title" class="text-xs uppercase tracking-wider opacity-80">ยอดเงินคงเหลือ</span>
-                <button onclick="resetMyData()" class="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition">รีเซ็ต</button>
-            </div>
-            <div class="text-3xl font-bold mb-2">฿ <span id="wallet-balance">0.00</span></div>
+        <div class="border-t pt-4">
+            <h2 class="text-sm font-semibold text-gray-700 mb-2">จำลองการสแกนจ่ายเงิน (ทดสอบเครื่องผู้ซื้อ)</h2>
             <div class="flex gap-2">
-                <button id="dashboard-action-btn" onclick="handleMainAction()" class="text-xs bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition font-medium">+ เติมเงินจำลอง</button>
-            </div>
-        </section>
-
-        <!-- ฝั่งผู้ซื้อ -->
-        <div id="view-buyer" class="space-y-4 hidden">
-            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-                <h2 class="text-lg font-bold mb-3 text-slate-700">สแกน QR เพื่อจ่ายเงิน</h2>
-                
-                <div class="flex gap-2 mb-3">
-                    <button onclick="startCameraScanner()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl text-sm font-medium transition">📷 เปิดกล้องสแกน</button>
-                    <label class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-xl text-sm font-medium transition text-center cursor-pointer border border-slate-300">
-                        📁 เลือกรูป QR
-                        <input type="file" accept="image/*" class="hidden" onchange="scanImageFile(event)">
-                    </label>
-                </div>
-
-                <div id="reader" class="rounded-xl overflow-hidden mb-3 hidden"></div>
-                <button id="stop-camera" onclick="stopCameraScanner()" class="w-full bg-red-100 text-red-600 py-1.5 rounded-xl text-xs font-semibold mb-3 hidden">ปิดกล้อง</button>
-
-                <div class="border-t border-slate-100 pt-3 mt-3">
-                    <label class="block text-xs font-semibold text-slate-500 mb-1">รหัสร้านค้าผู้รับ</label>
-                    <input type="text" id="pay-target" placeholder="เช่น SHOP-999" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:border-indigo-500 font-bold text-indigo-600">
-                    
-                    <label class="block text-xs font-semibold text-slate-500 mb-1">จำนวนเงิน (บาท)</label>
-                    <input type="number" id="pay-amount" placeholder="0.00" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-lg font-bold mb-4 focus:outline-none focus:border-indigo-500">
-                    
-                    <button onclick="executePayment()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold shadow-md transition">ยืนยันการโอนเงิน</button>
-                </div>
+                <input type="number" id="pay-amount" placeholder="ระบุจำนวนเงิน" class="border p-2 rounded w-full text-sm">
+                <button onclick="simulatePayment()" class="bg-green-600 text-white px-4 py-2 rounded text-sm font-semibold hover:bg-green-700">จ่ายเงิน</button>
             </div>
         </div>
-
-        <!-- ฝั่งผู้ขาย -->
-        <div id="view-seller" class="space-y-4 hidden">
-            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 text-center">
-                <h2 class="text-lg font-bold mb-1 text-slate-700">QR Code รับเงินร้านค้า</h2>
-                <p class="text-xs text-slate-400 mb-4">ให้เครื่องผู้ซื้อสแกน QR นี้เพื่อโอนเงินเข้าเครื่องคุณ</p>
-                
-                <div class="mb-3 text-left">
-                    <label class="block text-xs font-semibold text-slate-500 mb-1">ตั้งค่ารหัสร้านของคุณ</label>
-                    <div class="flex gap-2">
-                        <input type="text" id="input-seller-id" value="SHOP-999" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold uppercase">
-                        <button onclick="saveSellerId()" class="bg-indigo-600 text-white px-4 rounded-xl text-xs font-bold">บันทึก</button>
-                    </div>
-                </div>
-
-                <div id="qrcode-container" class="flex justify-center bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4 inline-block">
-                    <div id="qrcode"></div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="block text-xs font-semibold text-slate-500 mb-1 text-left">กำหนดจำนวนเงิน (ไม่บังคับ)</label>
-                    <input type="number" id="seller-set-amount" placeholder="ระบุยอดเงิน" oninput="generateQRCode()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
-                </div>
-            </div>
-        </div>
-
-        <!-- ประวัติรายการ -->
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 mt-4">
-            <h2 class="text-md font-bold text-slate-700 mb-3">ประวัติธุรกรรมของอุปกรณ์นี้</h2>
-            <div id="history-list" class="space-y-2 max-h-[250px] overflow-y-auto">
-                <p class="text-center text-slate-400 text-xs py-4">ยังไม่มีประวัติ</p>
-            </div>
-        </div>
-
     </div>
-
     <script>
         const firebaseConfig = {
-            databaseURL: "https://simpay-database-default-rtdb.firebaseio.com/"
+            apiKey: "AIzaSyBHzrbwxzIeSnU8chfkHTXHRoYJXF-WpxM",
+            authDomain: "simpay-project-c81fa.firebaseapp.com",
+            databaseURL: "https://simpay-project-c81fa-default-rtdb.firebaseio.com",
+            projectId: "simpay-project-c81fa",
+            storageBucket: "simpay-project-c81fa.firebasestorage.app",
+            messagingSenderId: "135422057973",
+            appId: "1:135422057973:web:af275bdb1d16a82162d4bc"
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-
-        let myRole = localStorage.getItem('simpay_role') || null;
-        let myBuyerId = localStorage.getItem('simpay_buyer_id') || 'BUYER-' + Math.floor(Math.random() * 1000);
-        let mySellerId = localStorage.getItem('simpay_seller_id') || 'SHOP-999';
-
-        let localData = {
-            balance: 1000.00,
-            history: []
-        };
-
-        let html5QrCode = null;
-
-        if (myRole) {
-            document.getElementById('role-selector').classList.add('hidden');
-            document.getElementById('app-container').classList.remove('hidden');
-            initApp();
-        }
-
-        function setRole(role) {
-            localStorage.setItem('simpay_role', role);
-            myRole = role;
-            document.getElementById('role-selector').classList.add('hidden');
-            document.getElementById('app-container').classList.remove('hidden');
-            initApp();
-        }
-
-        function logoutRole() {
-            localStorage.removeItem('simpay_role');
-            location.reload();
-        }
-
-        function initApp() {
-            const header = document.getElementById('app-header');
-            const badge = document.getElementById('role-badge');
-            
-            if (myRole === 'buyer') {
-                header.className = "bg-indigo-600 text-white shadow-md p-3 text-center text-xs font-semibold rounded-t-2xl mb-2 flex justify-between items-center px-4";
-                badge.innerText = `📱 โหมดผู้ซื้อ (ID: ${myBuyerId})`;
-                document.getElementById('view-buyer').classList.remove('hidden');
-                document.getElementById('view-seller').classList.add('hidden');
-                document.getElementById('wallet-title').innerText = "ยอดเงินผู้ซื้อคงเหลือ";
-                document.getElementById('dashboard-action-btn').innerText = "+ เติมเงิน 500";
-                
-                db.ref(`users/${myBuyerId}`).on('value', (snapshot) => {
-                    let data = snapshot.val();
-                    if (data) {
-                        localData.balance = data.balance ?? 1000.00;
-                        localData.history = data.history ?? [];
-                    } else {
-                        syncBuyerData(1000.00, []);
-                    }
-                    updateUI();
-                });
-
-            } else {
-                header.className = "bg-emerald-600 text-white shadow-md p-3 text-center text-xs font-semibold rounded-t-2xl mb-2 flex justify-between items-center px-4";
-                badge.innerText = `💰 โหมดผู้ขาย (ร้าน: ${mySellerId})`;
-                document.getElementById('view-seller').classList.remove('hidden');
-                document.getElementById('view-buyer').classList.add('hidden');
-                document.getElementById('wallet-title').innerText = "ยอดเงินยอดขายร้านค้า";
-                document.getElementById('dashboard-action-btn').innerText = "+ ถอนเงินออก";
-                document.getElementById('input-seller-id').value = mySellerId;
-
-                db.ref(`sellers/${mySellerId}`).on('value', (snapshot) => {
-                    let data = snapshot.val();
-                    if (data) {
-                        localData.balance = data.balance ?? 0.00;
-                        localData.history = data.history ?? [];
-                    } else {
-                        syncSellerData(0.00, []);
-                    }
-                    updateUI();
-                });
-
-                setTimeout(generateQRCode, 100);
-            }
-        }
-
-        function syncBuyerData(balance, history) {
-            db.ref(`users/${myBuyerId}`).set({ balance, history });
-        }
-
-        function syncSellerData(balance, history) {
-            db.ref(`sellers/${mySellerId}`).set({ balance, history });
-        }
-
-        function updateUI() {
-            document.getElementById('wallet-balance').innerText = localData.balance.toLocaleString('en-US', {minimumFractionDigits: 2});
-            
-            const container = document.getElementById('history-list');
-            if (localData.history.length === 0) {
-                container.innerHTML = `<p class="text-center text-slate-400 text-xs py-4">ยังไม่มีประวัติ</p>`;
+        const shopId = "SHOP-999";
+        const balanceRef = db.ref('shops/' + shopId + '/balance');
+        balanceRef.on('value', (snapshot) => {
+            const currentBalance = snapshot.val() || 0;
+            document.getElementById('balance-display').innerText = `฿ ${currentBalance.toFixed(2)}`;
+        });
+        function simulatePayment() {
+            const amountInput = document.getElementById('pay-amount');
+            const amount = parseFloat(amountInput.value);
+            if (isNaN(amount) || amount <= 0) {
+                alert("กรุณาระบุจำนวนเงินที่ถูกต้อง");
                 return;
             }
-
-            container.innerHTML = localData.history.map(item => {
-                let isIncome = (item.type === 'TOPUP' || item.type === 'RECEIVE');
-                return `
-                    <div class="flex justify-between items-center p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
-                        <div>
-                            <div class="font-semibold text-slate-700">${item.title}</div>
-                            <div class="text-[10px] text-slate-400">${item.time}</div>
-                        </div>
-                        <div class="text-right">
-                            <div class="font-bold ${isIncome ? 'text-emerald-600' : 'text-rose-600'}">
-                                ${isIncome ? '+' : '-'}${item.amount.toLocaleString('en-US', {minimumFractionDigits: 2})} ฿
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function handleMainAction() {
-            if (myRole === 'buyer') {
-                localData.balance += 500;
-                localData.history.unshift({ title: 'เติมเงินจำลอง', amount: 500, type: 'TOPUP', time: new Date().toLocaleString('th-TH') });
-                syncBuyerData(localData.balance, localData.history);
-                alert('เติมเงินสำเร็จ +500 บาท');
-            } else {
-                if (localData.balance <= 0) { alert('ไม่มีเงินให้ถอน'); return; }
-                let amt = localData.balance;
-                localData.balance = 0;
-                localData.history.unshift({ title: 'ถอนเงินยอดขายออก', amount: amt, type: 'WITHDRAW', time: new Date().toLocaleString('th-TH') });
-                syncSellerData(localData.balance, localData.history);
-                alert(`ถอนเงินสำเร็จ ${amt.toLocaleString()} บาท`);
-            }
-        }
-
-        function resetMyData() {
-            if (confirm('รีเซ็ตข้อมูลทั้งหมดของเครื่องนี้?')) {
-                localData.balance = (myRole === 'buyer' ? 1000.00 : 0.00);
-                localData.history = [];
-                if (myRole === 'buyer') syncBuyerData(localData.balance, localData.history);
-                else syncSellerData(localData.balance, localData.history);
-                alert('รีเซ็ตเรียบร้อย');
-            }
-        }
-
-        function saveSellerId() {
-            let newId = document.getElementById('input-seller-id').value.trim().toUpperCase();
-            if (!newId) return;
-            mySellerId = newId;
-            localStorage.setItem('simpay_seller_id', mySellerId);
-            alert('บันทึกรหัสร้านค้าเป็น: ' + mySellerId);
-            location.reload();
-        }
-
-        function generateQRCode() {
-            const amountInput = document.getElementById('seller-set-amount');
-            const amount = amountInput ? parseFloat(amountInput.value) || 0 : 0;
-            const qrData = `SIMPAY|${mySellerId}|${amount}`;
-
-            const qrContainer = document.getElementById("qrcode");
-            if(qrContainer) {
-                qrContainer.innerHTML = "";
-                new QRCode(qrContainer, {
-                    text: qrData,
-                    width: 160,
-                    height: 160,
-                    colorDark: "#0f172a",
-                    colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.H
-                });
-            }
-        }
-
-        function startCameraScanner() {
-            document.getElementById('reader').classList.remove('hidden');
-            document.getElementById('stop-camera').classList.remove('hidden');
-            
-            html5QrCode = new Html5Qrcode("reader");
-            html5QrCode.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 200, height: 200 } },
-                qrCodeMessage => {
-                    handleScannedData(qrCodeMessage);
-                    stopCameraScanner();
-                },
-                errorMessage => {}
-            ).catch(err => { alert("ไม่สามารถเปิดกล้องได้: " + err); });
-        }
-
-        function stopCameraScanner() {
-            if (html5QrCode && html5QrCode.isScanning) {
-                html5QrCode.stop().then(() => {
-                    document.getElementById('reader').classList.add('hidden');
-                    document.getElementById('stop-camera').classList.add('hidden');
-                }).catch(err => {});
-            } else {
-                document.getElementById('reader').classList.add('hidden');
-                document.getElementById('stop-camera').classList.add('hidden');
-            }
-        }
-
-        function scanImageFile(e) {
-            if (e.target.files.length == 0) return;
-            const imageFile = e.target.files[0];
-            const html5QrCodeImg = new Html5Qrcode("reader");
-            html5QrCodeImg.scanFile(imageFile, true)
-                .then(qrCodeMessage => { handleScannedData(qrCodeMessage); })
-                .catch(err => { alert("ไม่พบ QR Code ในรูปภาพนี้"); });
-        }
-
-        function handleScannedData(data) {
-            if (data.startsWith("SIMPAY|")) {
-                let parts = data.split("|");
-                if (parts.length >= 3) {
-                    document.getElementById('pay-target').value = parts[1];
-                    let amt = parseFloat(parts[2]);
-                    if (amt > 0) document.getElementById('pay-amount').value = amt;
-                    alert("สแกน QR ร้านค้าสำเร็จ!");
-                    return;
+            balanceRef.transaction((currentBalance) => {
+                return (currentBalance || 0) + amount;
+            }, (error, committed) => {
+                if (committed) {
+                    alert(`โอนเงินจำนวน ฿${amount.toFixed(2)} สำเร็จ!`);
+                    amountInput.value = "";
+                } else if (error) {
+                    alert("เกิดข้อผิดพลาด: " + error);
                 }
-            }
-            document.getElementById('pay-target').value = data;
-            alert("สแกนข้อมูลสำเร็จ: " + data);
+            });
         }
-
-        async function executePayment() {
-            const targetSeller = document.getElementById('pay-target').value.trim().toUpperCase();
-            const amount = parseFloat(document.getElementById('pay-amount').value);
-
-            if(!targetSeller) { alert('กรุณาระบุรหัสร้านค้า'); return; }
-            if(isNaN(amount) || amount <= 0) { alert('กรุณาระบุจำนวนเงิน'); return; }
-            if(localData.balance < amount) { alert('ยอดเงินของคุณไม่พอโอน!'); return; }
-
-            let sellerRef = db.ref(`sellers/${targetSeller}`);
-            let snapshot = await sellerRef.once('value');
-            let sellerData = snapshot.val();
-
-            if (!sellerData) {
-                alert(`ไม่พบร้านค้า "${targetSeller}" ในระบบออนไลน์ กรุณาตรวจสอบรหัสร้านค้าอีกครั้ง`);
-                return;
+        function resetBalance() {
+            if (confirm("ต้องการรีเซ็ตยอดเงินเป็น 0 ใช่หรือไม่?")) {
+                balanceRef.set(0);
             }
-
-            localData.balance -= amount;
-            localData.history.unshift({
-                title: `โอนให้ร้าน: ${targetSeller}`,
-                amount: amount,
-                type: 'TRANSFER',
-                time: new Date().toLocaleString('th-TH')
-            });
-            syncBuyerData(localData.balance, localData.history);
-
-            let newSellerBalance = (sellerData.balance || 0) + amount;
-            let newSellerHistory = sellerData.history || [];
-            newSellerHistory.unshift({
-                title: `รับเงินจากผู้ซื้อ (${myBuyerId})`,
-                amount: amount,
-                type: 'RECEIVE',
-                time: new Date().toLocaleString('th-TH')
-            });
-
-            sellerRef.set({
-                balance: newSellerBalance,
-                history: newSellerHistory
-            });
-
-            alert(`โอนเงิน ${amount.toLocaleString()} บาท ไปยังร้าน ${targetSeller} สำเร็จ!`);
-            document.getElementById('pay-target').value = '';
-            document.getElementById('pay-amount').value = '';
         }
     </script>
 </body>
-  </html>
-  
+</html>
